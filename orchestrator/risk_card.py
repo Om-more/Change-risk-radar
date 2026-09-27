@@ -17,12 +17,28 @@ FALLBACK_CARD = {
 
 
 def _extract_json(text: str) -> dict | None:
-    """Bob sometimes wraps JSON in prose or code fences despite instructions."""
+    """Bob sometimes wraps JSON in prose or code fences despite instructions.
+    It also renders long lines wrapped to the terminal's display width,
+    which injects literal newlines (plus trailing padding spaces) into
+    what should be continuous JSON string values -- making the result
+    syntactically invalid JSON (raw control characters aren't allowed
+    unescaped inside a JSON string). We collapse "whitespace, newline,
+    whitespace" sequences back into a single space before parsing, which
+    fixes the wrap artifacts without touching real JSON structure (commas,
+    braces, brackets aren't line-wrapped mid-token by the CLI)."""
     match = re.search(r"\{.*\}", text, re.DOTALL)
     if not match:
         return None
+
+    candidate = match.group(0)
     try:
-        return json.loads(match.group(0))
+        return json.loads(candidate)
+    except json.JSONDecodeError:
+        pass
+
+    dewrapped = re.sub(r"[ \t]*\n[ \t]*", " ", candidate)
+    try:
+        return json.loads(dewrapped)
     except json.JSONDecodeError:
         return None
 
