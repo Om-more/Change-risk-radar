@@ -97,7 +97,8 @@ The developer gets the result **automatically**, without manually uploading code
 
 ## 🧠 Architecture
 
-![Change Risk Radar Architecture](architecture (1).png)
+<img width="1574" height="1125" alt="architecture (1)" src="https://github.com/user-attachments/assets/d243debe-9502-448f-8c03-55a1ffd8d467" />
+
 
 ### Agent orchestration
 
