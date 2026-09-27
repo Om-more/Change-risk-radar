@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Change Risk Radar</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --border: #30363d;
+    --text: #c9d1d9;
+    --text-dim: #8b949e;
+    --green: #3fb950;
+    --amber: #d29922;
+    --red: #f85149;
+    --blue: #58a6ff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 40px 24px 80px; }
+
+  header { margin-bottom: 32px; }
+  header h1 {
+    font-size: 22px;
+    font-weight: 600;
+    margin: 0 0 4px;
+    letter-spacing: -0.01em;
+  }
+  header p { color: var(--text-dim); margin: 0; font-size: 14px; }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+
+  label {
+    display: block;
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+  }
+  input, textarea {
+    width: 100%;
+    background: #010409;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    padding: 10px 12px;
+    font-family: "SF Mono", Consolas, monospace;
+    font-size: 13px;
+    resize: vertical;
+  }
+  input { margin-bottom: 16px; }
+  textarea { min-height: 160px; margin-bottom: 16px; }
+  input:focus, textarea:focus, button:focus {
+    outline: 2px solid var(--blue);
+    outline-offset: 1px;
+  }
+
+  button {
+    background: var(--green);
+    color: #0d1117;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 18px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button:disabled { opacity: 0.6; cursor: default; }
+  button:hover:not(:disabled) { filter: brightness(1.08); }
+
+  .status { font-size: 13px; color: var(--text-dim); margin-top: 12px; }
+
+  .hidden { display: none; }
+
+  .verdict-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .verdict-badge {
+    font-size: 13px;
+    font-weight: 700;
+    padding: 4px 12px;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  .verdict-block { background: rgba(248,81,73,0.15); color: var(--red); border: 1px solid var(--red); }
+  .verdict-review { background: rgba(210,153,34,0.15); color: var(--amber); border: 1px solid var(--amber); }
+  .verdict-approve { background: rgba(63,185,80,0.15); color: var(--green); border: 1px solid var(--green); }
+  .impact-label { color: var(--text-dim); font-size: 13px; }
+
+  .section-title {
+    font-size: 12px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin: 20px 0 8px;
+  }
+  .section-title:first-child { margin-top: 0; }
+
+  ul.findings { margin: 0; padding-left: 20px; }
+  ul.findings li { margin-bottom: 6px; font-size: 14px; }
+  .chip {
+    display: inline-block;
+    background: #1f2733;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 12px;
+    font-family: "SF Mono", Consolas, monospace;
+    margin: 0 6px 6px 0;
+  }
+  .empty { color: var(--text-dim); font-size: 13px; font-style: italic; }
+
+  details { margin-top: 24px; }
+  summary {
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-bottom: 12px;
+  }
+  .agent-report {
+    border-top: 1px solid var(--border);
+    padding: 14px 0;
+  }
+  .agent-report:last-child { border-bottom: none; }
+  .agent-name {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--blue);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    margin-bottom: 6px;
+  }
+  .agent-text {
+    font-size: 13px;
+    color: var(--text-dim);
+    white-space: pre-wrap;
+    font-family: "SF Mono", Consolas, monospace;
+    line-height: 1.6;
+  }
+
+  .error-box {
+    background: rgba(248,81,73,0.1);
+    border: 1px solid var(--red);
+    border-radius: 6px;
+    padding: 14px;
+    font-size: 13px;
+    color: var(--red);
+    margin-top: 16px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>Change Risk Radar</h1>
+    <p>What breaks if you make this change?</p>
+  </header>
+
+  <div class="status" id="statusLine">Loading latest analysis...</div>
+  <div class="panel hidden" id="resultsPanel"></div>
+
+  <details style="margin-top:32px;">
+    <summary>Run a manual test instead</summary>
+    <div class="panel" style="margin-top:12px;">
+      <label for="repoPath">Repo path (on this machine)</label>
+      <input id="repoPath" type="text" placeholder="D:\dummy_repo" value="D:\dummy_repo">
+
+      <label for="diffInput">Diff</label>
+      <textarea id="diffInput" placeholder="Paste output of: git diff HEAD"></textarea>
+
+      <button id="analyzeBtn" onclick="runAnalysis()">Analyze change</button>
+    </div>
+  </details>
+
+</div>
+
+<script>
+const API_URL = "http://localhost:8000/analyze";
+const LATEST_URL = "http://localhost:8000/latest";
+
+// Auto-run on page load: this page is opened automatically by the
+// pre-commit hook right after an analysis just ran, so we fetch and
+// show that result immediately instead of waiting for manual input.
+window.addEventListener("DOMContentLoaded", loadLatest);
+
+async function loadLatest() {
+  const statusLine = document.getElementById("statusLine");
+  const resultsPanel = document.getElementById("resultsPanel");
+  try {
+    const res = await fetch(LATEST_URL);
+    if (res.status === 404) {
+      statusLine.textContent = "No analysis has run yet. Make a commit, or use the manual test below.";
+      return;
+    }
+    if (!res.ok) throw new Error(`Server responded ${res.status}`);
+    const data = await res.json();
+    statusLine.textContent = "";
+    renderResults(data);
+  } catch (err) {
+    statusLine.textContent = `Could not reach the orchestrator at ${LATEST_URL}. Is uvicorn running?`;
+  }
+}
+
+async function runAnalysis() {
+  const repoPath = document.getElementById("repoPath").value.trim();
+  const diff = document.getElementById("diffInput").value.trim();
+  const btn = document.getElementById("analyzeBtn");
+  const statusLine = document.getElementById("statusLine");
+  const resultsPanel = document.getElementById("resultsPanel");
+
+  if (!repoPath || !diff) {
+    statusLine.textContent = "Enter both a repo path and a diff first.";
+    return;
+  }
+
+  btn.disabled = true;
+  statusLine.textContent = "Running 4 agents against your codebase...";
+  resultsPanel.classList.add("hidden");
+
+  try {
+    const res = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ repo_path: repoPath, diff: diff })
+    });
+
+    if (!res.ok) {
+      throw new Error(`Server responded ${res.status}`);
+    }
+
+    const data = await res.json();
+    renderResults(data);
+    statusLine.textContent = "";
+  } catch (err) {
+    statusLine.textContent = "";
+    resultsPanel.classList.remove("hidden");
+    resultsPanel.innerHTML = `
+      <div class="error-box">
+        Could not reach the orchestrator at ${API_URL}.<br>
+        Confirm uvicorn is running (orchestrator.main:app) and try again.<br>
+        Details: ${escapeHtml(err.message)}
+      </div>`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function renderResults(data) {
+  const card = data.risk_card || {};
+  const reports = data.agent_reports || {};
+  const verdict = (card.verdict || "review").toLowerCase();
+  const verdictClass = ["block", "review", "approve"].includes(verdict)
+    ? `verdict-${verdict}` : "verdict-review";
+
+  const listOrEmpty = (arr, emptyText) => {
+    if (!arr || arr.length === 0) return `<div class="empty">${emptyText}</div>`;
+    return `<ul class="findings">${arr.map(i => `<li>${escapeHtml(i)}</li>`).join("")}</ul>`;
+  };
+
+  const agentLabels = {
+    code_impact: "Code Impact Agent",
+    dependency: "Dependency Agent",
+    test_intel: "Test Intelligence Agent",
+    history: "History Agent"
+  };
+
+  const agentReportsHtml = Object.entries(agentLabels).map(([key, label]) => {
+    const text = reports[key] || "(no output)";
+    return `
+      <div class="agent-report">
+        <div class="agent-name">${label}</div>
+        <div class="agent-text">${escapeHtml(text)}</div>
+      </div>`;
+  }).join("");
+
+  const panel = document.getElementById("resultsPanel");
+  panel.classList.remove("hidden");
+  panel.innerHTML = `
+    <div class="verdict-row">
+      <span class="verdict-badge ${verdictClass}">${escapeHtml(verdict)}</span>
+      <span class="impact-label">Impact: ${escapeHtml(card.impact_level || "unknown")}</span>
+    </div>
+
+    ${card.note ? `<div class="empty" style="margin-bottom:16px;">${escapeHtml(card.note)}</div>` : ""}
+
+    <div class="section-title">Affected services</div>
+    ${(card.affected_services && card.affected_services.length)
+      ? card.affected_services.map(s => `<span class="chip">${escapeHtml(s)}</span>`).join("")
+      : `<div class="empty">None identified</div>`}
+
+    <div class="section-title">Missing tests</div>
+    ${listOrEmpty(card.missing_tests, "No coverage gaps identified")}
+
+    <div class="section-title">Drift warnings</div>
+    ${listOrEmpty(card.drift_warnings, "No drift detected")}
+
+    <details>
+      <summary>View full agent reports</summary>
+      ${agentReportsHtml}
+    </details>
+  `;
+}
+
+function escapeHtml(str) {
+  const div = document.createElement("div");
+  div.textContent = str;
+  return div.innerHTML;
+}
+</script>
+</body>
+</html>
