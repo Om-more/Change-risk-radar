@@ -97,7 +97,7 @@ The developer gets the result **automatically**, without manually uploading code
 
 ## 🧠 Architecture
 
-![Change Risk Radar Architecture](docs/architecture(1).png)
+![Change Risk Radar Architecture](architecture (1).png)
 
 ### Agent orchestration
 
