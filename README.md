@@ -1,67 +1,36 @@
-<div align="center">
+# Change Risk Radar
 
-# 🛡️ Change Risk Radar
+**What breaks if you make this change?**
 
-### AI-powered pre-commit change impact & regression intelligence
+Change Risk Radar runs 5 analysis agents (via IBM Bob 2.0) against a
+codebase every time you commit, and shows you the blast radius — affected
+services, missing test coverage, and doc/code drift — before you push.
 
-**Know what your code change can break — before it reaches production.**
+Built for the IBM Bob 2.0 Hackathon Challenge: *"improve a specific
+developer workflow... build a working prototype that demonstrates a full
+solution... leverage Agent mode, parallel tasks, subagents, and document
+understanding to manage and improve multiple steps, not just assist with
+coding."*
 
-<p>
-  <img src="https://img.shields.io/badge/IBM%20Bob-2.0-0F62FE?style=for-the-badge&logo=ibm" alt="IBM Bob 2.0"/>
-  <img src="https://img.shields.io/badge/FastAPI-Backend-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI"/>
-  <img src="https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python"/>
-  <img src="https://img.shields.io/badge/Git-Pre--Commit-E44C30?style=for-the-badge&logo=git&logoColor=white" alt="Git"/>
-  <img src="https://img.shields.io/badge/Multi--Agent-AI-7B61FF?style=for-the-badge" alt="Multi-Agent AI"/>
-</p>
+## How it works
 
-<p>
-  <a href="#-why-change-risk-radar">Why?</a> •
-  <a href="#-how-it-works">How it works</a> •
-  <a href="#-quick-start">Quick Start</a> •
-  <a href="#-integrate-with-your-repository">Integration</a> •
-  <a href="#-agents">Agents</a> •
-  <a href="#-contributing">Contributing</a>
-</p>
+1. You commit code in your project
+2. A git pre-commit hook sends the diff to a local orchestrator
+3. The orchestrator runs 4 agents in parallel via `bob -p` (Code Impact,
+   Dependency, Test Intelligence, History), then a 5th agent (Risk Card
+   Composer) merges their findings into one structured verdict
+4. Your browser automatically opens to a dashboard showing the result —
+   no manual steps, no copy-pasting a diff
 
-</div>
+This is a **local-only tool**, the same as ESLint, Husky, or a local
+Postgres instance: it needs to be running in the background on your
+machine for the hook to work. It does not require any hosting or
+external server — everything happens on localhost.
 
----
+## Setup (one-time, ~2 minutes)
 
-## 🚨 The Problem
-
-A developer changes one function.
-
-That change may silently affect:
-
-- downstream services
-- API contracts
-- database models
-- existing tests
-- business rules
-- historical bug patterns
-- documentation and architecture assumptions
-
-Today, developers often discover these consequences through manual code tracing, broad regression runs, code reviews, or — worst case — after deployment.
-
-### The question
-
-> **"What breaks if I make this change?"**
-
-### The answer
-
-**Change Risk Radar automatically investigates the change at commit time and gives the developer a risk report before the change moves further through the development lifecycle.**
-
----
-
-## 💡 What Change Risk Radar Does
-
-Change Risk Radar attaches to a Git repository through a **pre-commit hook**.
-
-When the developer commits:
-
-```bash
-git commit -m "update statement service"
 ```
+<<<<<<< HEAD
 
 the workflow becomes:
 
@@ -144,533 +113,82 @@ source .venv/bin/activate
 ## 3. Install dependencies
 
 ```bash
+=======
+>>>>>>> 7107266 (final update)
 pip install -r requirements.txt
 ```
 
-## 4. Configure environment variables
+This variant uses the Groq API instead of Bob Shell. Copy `.env.example` to
+`.env` and set `GROQ_API_KEY` (get one at console.groq.com/keys).
 
-Create a `.env` file:
+**1. Start the orchestrator and leave it running:**
 
-```env
-IBM_BOB_API_KEY=your_key_here
-IBM_BOB_MODEL=your_model_here
-
-# Optional
-RADAR_PORT=8000
-RADAR_HOST=127.0.0.1
+```
+uvicorn orchestrator.main:app --reload
 ```
 
-> Keep credentials out of Git. Add `.env` to `.gitignore`.
+Keep this terminal open while you work — same as you'd leave a local dev
+server running for any other tool.
 
-## 5. Start the Change Risk Radar server
-
-```bash
-uvicorn orchestrator.main:app --reload --port 8000
-```
-
-The API will be available at:
-
-```text
-http://127.0.0.1:8000
-```
-
-Dashboard:
-
-```text
-http://127.0.0.1:8000/dashboard
-```
-
----
-
-# 🔌 Integrate With Your Repository
-
-The main goal is **zero-change developer workflow**.
-
-The developer should continue using Git normally.
-
-## Option A — Copy the pre-commit hook
-
-Copy the provided hook into the repository being monitored:
-
-```text
-your-main-repo/
-└── .git/
-    └── hooks/
-        └── pre-commit
-```
-
-Windows PowerShell example:
+**2. Install the git hook into the repo you want to protect:**
 
 ```powershell
-Copy-Item "path\to\change-risk-radar\pre-commit-hook-example.sh" `
-          -Destination ".git\hooks\pre-commit"
+Copy-Item pre-commit-hook-example.sh <target-repo>\.git\hooks\pre-commit
 ```
 
-For Git Bash / macOS / Linux:
+(No file extension on the destination — git looks for an exact filename.)
 
-```bash
-cp path/to/change-risk-radar/pre-commit-hook-example.sh .git/hooks/pre-commit
-chmod +x .git/hooks/pre-commit
+That's it. Every commit in `<target-repo>` now triggers analysis
+automatically.
+
+## Try it
+
+Make a change in your target repo, then:
+
 ```
-
-## Option B — Install the hook from the project
-
-If your team wants a repeatable installation process, provide an installer:
-
-```bash
-./install-hook.sh
-```
-
-The installer should place the hook at:
-
-```text
-.git/hooks/pre-commit
-```
-
-and make it executable where required.
-
----
-
-# 🔄 Developer Workflow
-
-Once installed, the developer does **not** need to learn a new workflow.
-
-### Normal workflow
-
-```bash
 git add .
-git commit -m "update statement service"
+git commit -m "test"
 ```
 
-### Behind the scenes
+A browser window opens automatically to `http://localhost:8000/dashboard`
+showing the risk card for that change.
 
-```text
-git commit
-    │
-    ▼
-pre-commit hook
-    │
-    ▼
-Change Risk Radar API
-    │
-    ▼
-5-agent analysis
-    │
-    ▼
-Risk report generated
-    │
-    ▼
-Dashboard opens
+You can also trigger an analysis manually without committing, via the
+"Run a manual test" section on the dashboard, or directly:
+
+```
+curl -X POST http://localhost:8000/analyze \
+  -H "Content-Type: application/json" \
+  -d '{"repo_path": "/absolute/path/to/repo", "diff": "paste a git diff here"}'
 ```
 
----
+## Project structure
 
-# 📊 Example Risk Report
-
-A typical result can look like:
-
-```text
-┌───────────────────────────────────────────────┐
-│              CHANGE RISK RADAR                │
-├───────────────────────────────────────────────┤
-│ STATUS: BLOCK                                 │
-│ IMPACT: HIGH                                  │
-│                                               │
-│ AFFECTED SERVICES                             │
-│ • statement_service                           │
-│ • payment_service                             │
-│ • fee_service                                 │
-│                                               │
-│ MISSING TESTS                                 │
-│ • outstanding fee calculation                 │
-│ • statement integration                       │
-│ • unsettled payment scenario                  │
-│                                               │
-│ DRIFT WARNINGS                                │
-│ • undocumented runtime dependency             │
-│ • model changed without schema coverage       │
-│ • service currently lacks test coverage       │
-└───────────────────────────────────────────────┘
+```
+orchestrator/
+  main.py       FastAPI app: /analyze, /latest, /dashboard, /health
+  agents.py     Runs each agent via `bob -p`, handles Windows quirks
+                (cmd.exe .cmd resolution, stdin piping for large content,
+                transcript-output cleaning)
+  prompts.py    Role prompts for the 5 agents
+  risk_card.py  Merges the 4 agent reports into one JSON risk card
+dashboard.html  Auto-loads and renders the latest analysis on open
+pre-commit-hook-example.sh   Copy into a target repo's .git/hooks/
+requirements.txt
 ```
 
-The purpose is not to replace the developer's judgment.
-
-It is to surface **hidden impact before the change becomes a production problem**.
-
----
-
-# 🤖 Agent Responsibilities
-
-## 1. Code Impact Agent
-
-Analyzes the changed code and traces relevant relationships.
-
-```text
-Changed function
-      ↓
-Callers
-      ↓
-Dependent functions
-      ↓
-Potentially affected components
-```
-
-Useful for answering:
-
-> "What code directly or indirectly depends on this?"
-
----
-
-## 2. Dependency Agent
-
-Builds a dependency view across the project.
-
-It can inspect:
-
-- imports
-- service references
-- API usage
-- configuration
-- project structure
-- documented architecture
-
-Useful for answering:
-
-> "Which services or components could be affected?"
-
----
-
-## 3. Test Intelligence Agent
-
-Analyzes existing tests against the change.
-
-It identifies:
-
-- relevant existing tests
-- uncovered paths
-- missing scenarios
-- potentially affected test suites
-- regression opportunities
-
-Useful for answering:
-
-> "What should I test because of this change?"
-
----
-
-## 4. History Agent
-
-Uses repository history and available incident/change records.
-
-It looks for:
-
-- similar changes
-- previous failures
-- related commits
-- recurring defect patterns
-
-Useful for answering:
-
-> "Has something similar broken before?"
-
----
-
-## 5. Risk Card Composer
-
-Receives the outputs from the analysis agents and creates the final structured assessment.
-
-It combines:
-
-```text
-Code Impact
-     +
-Dependencies
-     +
-Tests
-     +
-Historical Evidence
-     ↓
-Risk Card
-```
-
-The dashboard presents the result in a form that a developer can act on quickly.
-
----
-
-# 🧩 Why Multi-Agent?
-
-A single general-purpose prompt has to perform too many unrelated tasks.
-
-Instead, Change Risk Radar separates the investigation:
-
-```text
-                  ┌──────────────────┐
-                  │   Orchestrator   │
-                  └────────┬─────────┘
-                           │
-          ┌────────────────┼────────────────┐
-          │                │                │
-          ▼                ▼                ▼
-       Code             Tests           History
-       Agent            Agent            Agent
-          │                │                │
-          └────────────────┼────────────────┘
-                           │
-                           ▼
-                    Risk Composer
-```
-
-This enables:
-
-- specialized reasoning
-- parallel analysis
-- clearer agent outputs
-- easier debugging
-- easier extension with additional agents
-
----
-
-# 🛠️ Technology Stack
-
-| Technology | Purpose |
-|---|---|
-| **IBM Bob 2.0** | AI-assisted development and agent workflow |
-| **Python** | Core implementation |
-| **FastAPI** | Local orchestration API |
-| **Git** | Source-control integration |
-| **Git pre-commit hooks** | Automatic workflow trigger |
-| **Async / parallel execution** | Concurrent agent analysis |
-| **HTML/CSS/JavaScript** | Risk dashboard |
-| **Git history** | Historical change context |
-| **Project documentation** | Context for dependency / drift analysis |
-
----
-
-# 📁 Suggested Repository Structure
-
-```text
-change-risk-radar/
-│
-├── orchestrator/
-│   ├── main.py
-│   ├── agents/
-│   │   ├── code_impact.py
-│   │   ├── dependency.py
-│   │   ├── test_intelligence.py
-│   │   ├── history.py
-│   │   └── risk_composer.py
-│   │
-│   └── services/
-│       ├── git_service.py
-│       └── analysis_service.py
-│
-├── dashboard/
-│   ├── index.html
-│   ├── styles.css
-│   └── app.js
-│
-├── hooks/
-│   └── pre-commit-hook-example.sh
-│
-├── docs/
-│   └── architecture.png
-│
-├── tests/
-│
-├── requirements.txt
-├── .env.example
-├── .gitignore
-└── README.md
-```
-
-> Adapt the structure above to the actual repository layout.
-
----
-
-# 🔐 Security & Repository Safety
-
-Change Risk Radar should be treated as a developer-side engineering tool.
-
-### Never commit:
-
-```text
-.env
-API keys
-tokens
-passwords
-private certificates
-production credentials
-```
-
-Recommended:
-
-```gitignore
-.env
-.venv/
-__pycache__/
-*.pyc
-```
-
-For enterprise adoption, the system should additionally support:
-
-- secret redaction
-- configurable file exclusions
-- local-only analysis
-- audit logging
-- role-based access
-- configurable retention
-- organization-specific policies
-
----
-
-# 🧪 Testing the Integration
-
-Create a small change in the monitored repository:
-
-```python
-def calculate_fee(amount):
-    return amount * 0.012
-```
-
-Then:
-
-```bash
-git add .
-git commit -m "change transaction fee"
-```
-
-Expected workflow:
-
-```text
-✔ Git detects commit
-✔ Pre-commit hook executes
-✔ Radar receives change
-✔ Agents analyze the change
-✔ Risk card is composed
-✔ Dashboard becomes available
-```
-
----
-
-# 🚦 Risk Policy
-
-A deployment can configure its own thresholds.
-
-Example:
-
-| Risk | Meaning | Suggested action |
-|---|---|---|
-| 🟢 LOW | Limited impact detected | Continue |
-| 🟡 MEDIUM | Review recommended | Continue with warning |
-| 🔴 HIGH | Significant impact / missing verification | Review or block |
-
-> Risk classification is an engineering aid, not an absolute guarantee of production safety.
-
----
-
-# 🎯 Design Principle
-
-Change Risk Radar is built around one simple question:
-
-## **"What breaks if I make this change?"**
-
-Traditional development tools primarily answer:
-
-> **"Is my code syntactically correct?"**
-
-Change Risk Radar aims to answer:
-
-> **"What are the consequences of this change across the system?"**
-
-That distinction is the core of the project.
-
----
-
-# 🗺️ Roadmap
-
-### Current
-
-- [x] Git pre-commit integration
-- [x] FastAPI orchestration
-- [x] Multi-agent analysis
-- [x] Parallel agent execution
-- [x] Risk-card synthesis
-- [x] Browser dashboard
-- [x] Code / dependency / test / history analysis
-
-### Next
-
-- [ ] GitHub Pull Request integration
-- [ ] GitLab / Bitbucket integration
-- [ ] IDE notifications
-- [ ] Inline PR comments
-- [ ] Automatic regression-test generation
-- [ ] Historical risk trends
-- [ ] Configurable organization policies
-- [ ] CI/CD quality gate
-- [ ] Risk explanation with evidence links
-- [ ] Repository-wide dependency graph
-
----
-
-# 🤝 Contributing
-
-Contributions are welcome.
-
-### 1. Fork
-
-```bash
-git clone <your-fork-url>
-cd change-risk-radar
-```
-
-### 2. Create a branch
-
-```bash
-git checkout -b feature/my-feature
-```
-
-### 3. Make your changes
-
-```bash
-git add .
-git commit -m "feat: add dependency analysis"
-```
-
-### 4. Push
-
-```bash
-git push origin feature/my-feature
-```
-
-### 5. Open a Pull Request
-
-Please include:
-
-- problem being solved
-- implementation details
-- screenshots for UI changes
-- tests added
-- limitations / known issues
-
----
-
-# 📜 License
-
-Add the project's chosen license here, for example:
-
-```text
-MIT License
-```
-
----
-
-<div align="center">
-
-### 🛡️ Change Risk Radar
-
-**Catch the impact before production catches the bug.**
-
-Built with ❤️ using **IBM Bob 2.0**
-
-</div>
+## Sample repo
+
+`dummy-bank/` (or wherever you keep it) is a toy banking microservices
+codebase — Payment, Fee, Settlement, Statement, Fraud Rule Engine — used
+to demo the tool against realistic cross-service dependencies, seeded
+doc/code drift, and intentional test coverage gaps.
+
+## Roadmap (beyond this hackathon)
+
+- Swap the local git hook for a GitHub App / webhook on PR-open, so the
+  whole team sees the same risk card on a pull request, not just the
+  commit author
+- Wire the History agent to a real incident tracker (Jira, PagerDuty)
+  instead of the demo MCP incident store
+- IDE integration (inline warning on save) instead of a browser popup

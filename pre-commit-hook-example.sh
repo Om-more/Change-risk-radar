@@ -5,16 +5,27 @@
 
 DIFF=$(git diff --cached)
 REPO_PATH=$(pwd)
+# The real commit hash doesn't exist yet at pre-commit time (the commit
+# object is created after this hook runs) -- a content hash of the diff
+# itself is the correct identifier here, and doubles as dedup for identical
+# diffs analyzed twice.
+DIFF_HASH=$(printf '%s' "$DIFF" | python -c "import sys,hashlib; print(hashlib.sha1(sys.stdin.buffer.read()).hexdigest()[:12])")
 
-PAYLOAD=$(python -c "
+# The diff goes through STDIN, not argv -- a real diff can easily exceed
+# the OS command-line length limit ("Argument list too long"), which a
+# small toy diff never hits but a real project's diff will. Only the
+# small values (repo path, hash) go through argv.
+PAYLOAD=$(printf '%s' "$DIFF" | python -c "
 import json, sys
-print(json.dumps({'repo_path': sys.argv[1], 'diff': sys.argv[2]}))
-" "$REPO_PATH" "$DIFF")
+diff = sys.stdin.read()
+print(json.dumps({'repo_path': sys.argv[1], 'diff': diff, 'commit_hash': sys.argv[2]}))
+" "$REPO_PATH" "$DIFF_HASH")
 
 echo "Running Change Risk Radar..."
-curl -s -X POST http://localhost:8000/analyze \
+# --data-binary @- reads the payload from stdin too, same reasoning.
+printf '%s' "$PAYLOAD" | curl -s -X POST http://localhost:8000/analyze \
   -H "Content-Type: application/json" \
-  -d "$PAYLOAD" > /dev/null
+  --data-binary @- > /dev/null
 
 # Auto-open the dashboard, which fetches /latest and renders it
 # immediately (no manual paste needed). webbrowser is cross-platform,

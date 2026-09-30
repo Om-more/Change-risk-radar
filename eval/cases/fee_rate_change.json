@@ -1,0 +1,8 @@
+{
+  "id": "fee_rate_change",
+  "description": "calculate_transaction_fee is called directly by process_payment() in payment_service (confirmed via callgraph.find_callers against the real repo -- not assumed). A rate change here should surface payment_service as affected.",
+  "diff": "diff --git a/services/fee_service/app.py b/services/fee_service/app.py\nindex abc1234..def5678 100644\n--- a/services/fee_service/app.py\n+++ b/services/fee_service/app.py\n@@ -29,7 +29,7 @@ def calculate_transaction_fee(amount: Decimal) -> Decimal:\n     if amount <= 0:\n         raise ValueError(\"amount must be positive\")\n-    return round_money(amount * Decimal(\"0.005\"))\n+    return round_money(amount * Decimal(\"0.0075\"))\n",
+  "expected_affected_services": ["payment_service"],
+  "min_verdict": "review",
+  "notes": "Ground truth verified with: python -c \"from orchestrator import callgraph; g = callgraph.build(repo); print(callgraph.format_callers(g, 'calculate_transaction_fee'))\" -- output confirmed services/payment_service/app.py:42 inside process_payment()."
+}

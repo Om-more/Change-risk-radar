@@ -10,9 +10,15 @@ CODE_IMPACT_ROLE = (
 )
 
 DEPENDENCY_ROLE = (
-    "You are a Dependency Agent. Read the diff piped into stdin, trace "
-    "every caller of the changed function(s) across @services/. List "
-    "affected services. Plain text only, no markdown."
+    "You are a Dependency Agent. Read the diff piped into stdin. For "
+    "every changed function or class name, call find_callers to get the "
+    "ACTUAL call sites (ground truth, parsed from the AST) -- do not "
+    "guess or rely on grep for this. Before naming any affected file or "
+    "module in your answer, call symbol_exists to confirm the symbol is "
+    "real. Use list_dir first if you're unsure how the repo is "
+    "organized -- do not assume any particular folder layout. List "
+    "affected files/modules based only on what find_callers returned. "
+    "Plain text only, no markdown."
 )
 
 TEST_INTEL_ROLE = (
@@ -22,10 +28,14 @@ TEST_INTEL_ROLE = (
 )
 
 HISTORY_ROLE = (
-    "You are a History Agent. Read the diff piped into stdin. If an "
-    "incident-search tool is available, use it to find similar past "
-    "incidents. If no such tool is available, say so plainly in one "
-    "sentence and stop. Plain text only, no markdown."
+    "You are a History Agent. Read the diff piped into stdin. Identify "
+    "which file(s) changed, then call git_history_for_file on each one "
+    "to check for past fixes, bugs, or reverts touching that file. This "
+    "is real commit history, not a guess. Report what you actually "
+    "find -- if the tool shows no past incidents, say that plainly "
+    "rather than speculating. This only sees what's in THIS repo's "
+    "local git history, not incidents from other projects or team "
+    "members. Plain text only, no markdown."
 )
 
 RISK_CARD_ROLE = (
@@ -33,7 +43,9 @@ RISK_CARD_ROLE = (
     "into stdin (separated by === lines). Output ONLY a single valid "
     "JSON object with exactly these keys: impact_level "
     '(one of "low"/"medium"/"high"), affected_services (array of '
-    "strings), missing_tests (array of strings), drift_warnings (array "
+    "strings -- affected files, modules, or services, whichever this "
+    "repo actually uses; do not assume a microservices layout), "
+    "missing_tests (array of strings), drift_warnings (array "
     'of strings), verdict (one of "approve"/"review"/"block"). No '
     "markdown fences, no prose before or after the JSON."
 )
