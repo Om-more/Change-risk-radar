@@ -1,4 +1,10 @@
 # Change Risk Radar
+![Python](https://shields.io)
+![FastAPI](https://shields.io)
+![HTML5](https://shields.io)
+![Groq](https://shields.io)
+![ChromaDB](https://shields.io)
+![Hugging Face](https://shields.io)
 
 **What breaks if you make this change?**
 
