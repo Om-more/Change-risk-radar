@@ -27,29 +27,6 @@ Postgres instance: it needs to be running in the background on your
 machine for the hook to work. Everything happens on localhost; nothing
 is hosted externally.
 
-```text
-Developer Commit
-      │
-      ▼
-Git Pre-Commit Hook
-      │
-      ▼
-FastAPI Orchestrator
-      │
-      ├──────────────┬──────────────┬──────────────┐
-      ▼              ▼              ▼              ▼
- Code Impact     Dependency      Test Intel.     History
-    Agent          Agent           Agent           Agent
-      │              │               │              │
-      └──────────────┴──────────────┴──────────────┘
-                             │
-                             ▼
-                    Risk Card Composer
-                     (verified + scored)
-                             │
-                             ▼
-                         Dashboard
-```
 
 ![Architecture diagram](architecture%20%281%29.png)
 
