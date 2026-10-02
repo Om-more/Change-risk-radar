@@ -18,6 +18,8 @@ against the actual repo before it reaches the dashboard.
 Works on any Python repo, not just a specific project layout — see
 [Project structure](#project-structure) for how it adapts.
 
+
+Video Tutorial - (https://drive.google.com/file/d/1G6UntoLqWE5Ypg6RK-cQjy_Hj5qZPfB7/view?usp=sharing)
 ## How it works
 
 1. You commit code in your project
