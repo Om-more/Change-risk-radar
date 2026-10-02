@@ -13,10 +13,15 @@ hidden -- but it's a strict improvement over grep for the common case.
 """
 
 import ast
+import json
+import os
+import hashlib
 from dataclasses import dataclass, field
 from pathlib import Path
 
 SKIP_DIRS = {".git", ".venv", "venv", "__pycache__", "node_modules", ".pytest_cache"}
+CACHE_DIR_NAME = ".change_risk_cache"
+CACHE_FILE_NAME = "callgraph.json"
 
 
 @dataclass
@@ -92,18 +97,79 @@ class _Visitor(ast.NodeVisitor):
         self.generic_visit(node)
 
 
+def _cache_path(root: Path) -> Path:
+    cache = root / CACHE_DIR_NAME
+    cache.mkdir(exist_ok=True)
+    return cache / CACHE_FILE_NAME
+
+
+def _file_fingerprint(path: Path) -> str:
+    st = path.stat()
+    return f"{st.st_mtime_ns}:{st.st_size}"
+
+
 def build(repo_path: str) -> CallGraph:
+    """Build an incrementally cached AST index.
+
+    The repository is walked, but unchanged Python files are NOT parsed again.
+    This makes repeated analyses much faster on large repositories.
+    """
     root = Path(repo_path).resolve()
+    cache_file = _cache_path(root)
+    try:
+        cache = json.loads(cache_file.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        cache = {"files": {}}
+
+    current = {}
     graph = CallGraph()
-    for path in root.rglob("*.py"):
-        if set(path.parts) & SKIP_DIRS:
-            continue
+    files = [p for p in root.rglob("*.py") if not (set(p.parts) & SKIP_DIRS)]
+
+    for path in files:
+        rel = str(path.relative_to(root))
         try:
+            fp = _file_fingerprint(path)
+            current[rel] = fp
+            cached = cache.get("files", {}).get(rel)
+            if cached and cached.get("fingerprint") == fp:
+                defs = cached.get("definitions", [])
+                calls = cached.get("calls", [])
+                for d in defs:
+                    graph.definitions.setdefault(d["symbol"], []).append(
+                        Definition(d["symbol"], rel, d["line"], d["kind"])
+                    )
+                for c in calls:
+                    graph.calls.setdefault(c["symbol"], []).append(
+                        CallSite(c["symbol"], rel, c["line"], c["caller"])
+                    )
+                continue
+
             source = path.read_text(encoding="utf-8", errors="replace")
             tree = ast.parse(source, filename=str(path))
-        except (SyntaxError, OSError):
+            local = CallGraph()
+            _Visitor(local, rel).visit(tree)
+
+            for symbol, defs in local.definitions.items():
+                graph.definitions.setdefault(symbol, []).extend(defs)
+            for symbol, calls in local.calls.items():
+                graph.calls.setdefault(symbol, []).extend(calls)
+
+            cache.setdefault("files", {})[rel] = {
+                "fingerprint": fp,
+                "definitions": [d.__dict__ for ds in local.definitions.values() for d in ds],
+                "calls": [c.__dict__ for cs in local.calls.values() for c in cs],
+            }
+        except (SyntaxError, OSError, ValueError):
             continue
-        _Visitor(graph, str(path.relative_to(root))).visit(tree)
+
+    # Drop deleted files from the persistent cache.
+    cache["files"] = {k: v for k, v in cache.get("files", {}).items() if k in current}
+    try:
+        tmp = cache_file.with_suffix(".tmp")
+        tmp.write_text(json.dumps(cache), encoding="utf-8")
+        os.replace(tmp, cache_file)
+    except OSError:
+        pass
     return graph
 
 

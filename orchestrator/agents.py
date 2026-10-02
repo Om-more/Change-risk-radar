@@ -30,10 +30,10 @@ load_dotenv()
 
 GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 MODEL = os.getenv("GROQ_MODEL", "qwen/qwen3.8-27b")
-MAX_TOOL_ROUNDS = 8
-MAX_TOOL_OUTPUT_CHARS = 6000   # keep tool results small: free tier is token-limited
+MAX_TOOL_ROUNDS = int(os.getenv("MAX_TOOL_ROUNDS", "4"))
+MAX_TOOL_OUTPUT_CHARS = int(os.getenv("MAX_TOOL_OUTPUT_CHARS", "4000"))   # keep tool results small: free tier is token-limited
 MAX_RETRIES = 4
-_semaphore = threading.Semaphore(int(os.getenv("GROQ_MAX_CONCURRENCY", "2")))
+_semaphore = threading.Semaphore(int(os.getenv("GROQ_MAX_CONCURRENCY", "4")))
 
 TOOL_HINT = (
     "\n\nThe content to analyze is in the user message. Wherever the role "
@@ -371,20 +371,72 @@ def run_pytest_sync(repo_path: str) -> str:
         return "pytest run timed out."
 
 
+def changed_files_from_diff(diff: str) -> list[str]:
+    """Extract changed paths from a unified git diff."""
+    paths = []
+    for line in diff.splitlines():
+        if line.startswith("+++ b/"):
+            path = line[6:].strip()
+            if path != "/dev/null" and path not in paths:
+                paths.append(path)
+    return paths
+
+
+def _related_test_files(repo_path: str, changed_files: list[str]) -> list[str]:
+    root = Path(repo_path).resolve()
+    tests = []
+    stems = {Path(p).stem.replace("test_", "") for p in changed_files}
+    for p in root.rglob("test_*.py"):
+        if set(p.parts) & SKIP_DIRS:
+            continue
+        stem = p.stem.replace("test_", "")
+        if stem in stems or any(s and s in stem for s in stems):
+            tests.append(str(p.relative_to(root)))
+    for p in root.rglob("*_test.py"):
+        if set(p.parts) & SKIP_DIRS:
+            continue
+        stem = p.stem.replace("_test", "")
+        if stem in stems or any(s and s in stem for s in stems):
+            tests.append(str(p.relative_to(root)))
+    return list(dict.fromkeys(tests))[:12]
+
+
+def run_targeted_pytest_sync(repo_path: str, changed_files: list[str]) -> str:
+    """Run only likely affected tests; full suite is opt-in."""
+    if os.getenv("FULL_PYTEST", "0") == "1":
+        return run_pytest_sync(repo_path)
+    root = Path(repo_path).resolve()
+    targets = _related_test_files(repo_path, changed_files)
+    changed_tests = [p for p in changed_files if p.startswith(("test_", "tests/", "test/")) and (root / p).exists()]
+    targets = list(dict.fromkeys(changed_tests + targets))
+    if not targets:
+        return "Targeted pytest: no directly matching test files found. Full suite was skipped for speed."
+    try:
+        result = subprocess.run(
+            ["python", "-m", "pytest", "-q", *targets],
+            cwd=repo_path, capture_output=True, text=True,
+            encoding="utf-8", errors="replace", timeout=45,
+        )
+        return _truncate(result.stdout + "\n" + result.stderr)
+    except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
+        return f"Targeted pytest unavailable or timed out: {exc}"
+
+
 # -------------------------------------------------------------- agents
 async def run_code_impact(diff: str, repo_path: str) -> str:
-    return await run_llm(prompts.CODE_IMPACT_ROLE, diff, repo_path)
+    return await run_llm(prompts.CODE_IMPACT_ROLE, prompts.build_agent_input(diff, repo_path), repo_path)
 
 
 async def run_dependency(diff: str, repo_path: str) -> str:
-    return await run_llm(prompts.DEPENDENCY_ROLE, diff, repo_path)
+    return await run_llm(prompts.DEPENDENCY_ROLE, prompts.build_agent_input(diff, repo_path), repo_path)
 
 
 async def run_history(diff: str, repo_path: str) -> str:
-    return await run_llm(prompts.HISTORY_ROLE, diff, repo_path)
+    return await run_llm(prompts.HISTORY_ROLE, prompts.build_agent_input(diff, repo_path), repo_path)
 
 
 async def run_test_intel(diff: str, repo_path: str) -> str:
-    pytest_output = await asyncio.to_thread(run_pytest_sync, repo_path)
+    changed = changed_files_from_diff(diff)
+    pytest_output = await asyncio.to_thread(run_targeted_pytest_sync, repo_path, changed)
     stdin_content = prompts.build_test_intel_stdin(diff, pytest_output)
     return await run_llm(prompts.TEST_INTEL_ROLE, stdin_content, repo_path)

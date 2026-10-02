@@ -5,7 +5,7 @@ truncates at the first newline and has an ~8191 char command-line limit."""
 
 CODE_IMPACT_ROLE = (
     "You are a Code Impact Agent. Read the diff piped into stdin, "
-    "identify exactly which functions changed and what they do. "
+    "identify exactly which functions changed and what they do. Focus only on the changed files and directly relevant symbols. Do not explore unrelated files. "
     "Plain text only, no markdown."
 )
 
@@ -49,6 +49,14 @@ RISK_CARD_ROLE = (
     'of strings), verdict (one of "approve"/"review"/"block"). No '
     "markdown fences, no prose before or after the JSON."
 )
+
+
+def build_agent_input(diff: str, repo_path: str) -> str:
+    """Keep agents focused on the changed surface instead of the whole repo."""
+    from orchestrator.agents import changed_files_from_diff
+    files = changed_files_from_diff(diff)
+    file_list = "\n".join(files) if files else "(could not extract paths)"
+    return f"CHANGED FILES (focus here first):\n{file_list}\n\nDIFF:\n{diff}"
 
 
 def build_test_intel_stdin(diff: str, pytest_output: str) -> str:

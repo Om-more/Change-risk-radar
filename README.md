@@ -1,4 +1,10 @@
 # Change Risk Radar
+![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)
+![HTML5](https://img.shields.io/badge/HTML5-E34F26?style=for-the-badge&logo=html5&logoColor=white)
+![Groq](https://img.shields.io/badge/Groq-f55036?style=for-the-badge&logo=groq&logoColor=white)
+![ChromaDB](https://img.shields.io/badge/ChromaDB-000000?style=for-the-badge&logo=chromadb&logoColor=white)
+![Hugging Face](https://img.shields.io/badge/Hugging%20Face-FFD21E?style=for-the-badge&logo=huggingface&logoColor=black)
 
 **What breaks if you make this change?**
 
@@ -27,29 +33,6 @@ Postgres instance: it needs to be running in the background on your
 machine for the hook to work. Everything happens on localhost; nothing
 is hosted externally.
 
-```text
-Developer Commit
-      │
-      ▼
-Git Pre-Commit Hook
-      │
-      ▼
-FastAPI Orchestrator
-      │
-      ├──────────────┬──────────────┬──────────────┐
-      ▼              ▼              ▼              ▼
- Code Impact     Dependency      Test Intel.     History
-    Agent          Agent           Agent           Agent
-      │              │               │              │
-      └──────────────┴──────────────┴──────────────┘
-                             │
-                             ▼
-                    Risk Card Composer
-                     (verified + scored)
-                             │
-                             ▼
-                         Dashboard
-```
 
 ![Architecture diagram](architecture%20%281%29.png)
 
@@ -214,3 +197,14 @@ requirements.txt
   instead of local git log
 - IDE integration (inline warning on save) instead of a browser popup
 - Multi-language call graph support beyond Python
+
+## Performance for larger repositories
+
+Change Risk Radar uses incremental analysis so repeated scans do not rebuild the Python AST index from scratch. It also focuses agents on files in the supplied Git diff, runs targeted pytest by default, caches completed commit analyses, and runs independent agents concurrently.
+
+Optional environment controls:
+
+- `GROQ_MAX_CONCURRENCY=4` — concurrent LLM calls
+- `MAX_TOOL_ROUNDS=4` — maximum tool-exploration rounds per agent
+- `MAX_TOOL_OUTPUT_CHARS=4000` — cap tool output sent to the model
+- `FULL_PYTEST=1` — opt into the full test suite instead of targeted tests

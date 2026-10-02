@@ -52,8 +52,11 @@ async def analyze(request: AnalyzeRequest) -> dict:
     repo_path = request.repo_path
     diff = request.diff
 
-    from orchestrator.agents import invalidate_graph_cache
-    invalidate_graph_cache(repo_path)
+    # Avoid recomputing an already analyzed commit.
+    if request.commit_hash:
+        cached = storage.get(request.commit_hash)
+        if cached:
+            return cached
 
     # Code Impact, Dependency, History are independent -> run in parallel.
     # Test Intel runs its own real pytest pass first, so it's kicked off

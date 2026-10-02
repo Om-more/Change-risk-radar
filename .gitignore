@@ -5,3 +5,5 @@ __pycache__/
 .env
 out.md
 response.json
+# performance cache
+.change_risk_cache/
